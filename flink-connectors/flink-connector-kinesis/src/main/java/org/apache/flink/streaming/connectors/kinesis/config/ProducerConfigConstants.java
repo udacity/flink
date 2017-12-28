@@ -30,4 +30,9 @@ public class ProducerConfigConstants extends AWSConfigConstants {
 	/** Maximum number of items to pack into an aggregated record. **/
 	public static final String AGGREGATION_MAX_COUNT = "aws.producer.aggregationMaxCount";
 
+	public static final String AWS_ENDPOINT_HOSTNAME = "aws.endpoint.hostname";
+
+	public static final String AWS_ENDPOINT_PORT = "aws.endpoint.port";
+
+	public static final String AWS_ENDPOINT_VERIFY_CERT = "aws.endpoint.verify.cert";
 }

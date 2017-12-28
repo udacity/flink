@@ -181,6 +181,19 @@ public class FlinkKinesisProducer<OUT> extends RichSinkFunction<OUT> {
 					ProducerConfigConstants.AGGREGATION_MAX_COUNT, producerConfig.getAggregationMaxCount(), LOG));
 		}
 
+		if (configProps.containsKey(ProducerConfigConstants.AWS_ENDPOINT_HOSTNAME)) {
+			producerConfig.setCustomEndpoint(configProps.getProperty(ProducerConfigConstants.AWS_ENDPOINT_HOSTNAME));
+		}
+
+		if (configProps.containsKey(ProducerConfigConstants.AWS_ENDPOINT_PORT)) {
+			producerConfig.setPort(PropertiesUtil.getInt(configProps, ProducerConfigConstants.AWS_ENDPOINT_PORT, 4567));
+		}
+
+		if (configProps.containsKey(ProducerConfigConstants.AWS_ENDPOINT_VERIFY_CERT)) {
+			producerConfig.setVerifyCertificate(PropertiesUtil.getBoolean(configProps,
+				ProducerConfigConstants.AWS_ENDPOINT_VERIFY_CERT, true));
+		}
+
 		producer = new KinesisProducer(producerConfig);
 		callback = new FutureCallback<UserRecordResult>() {
 			@Override
