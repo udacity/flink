@@ -42,7 +42,7 @@ COPY kinesalite.crt /
 RUN set -x && \
   keytool -import -file /kinesalite.crt -storepass changeit -keystore $JAVA_HOME/jre/lib/security/cacerts -noprompt && \
   rm /kinesalite.crt && \
-  printf "\nlog4j.logger.com.udacity.data=DEBUG" >> $FLINK_HOME/conf/log4j-console.properties
+  printf "\nlog4j.logger.com.udacity.data=DEBUG\n" >> $FLINK_HOME/conf/log4j-console.properties
 
 COPY docker-entrypoint.sh /
 
