@@ -493,7 +493,7 @@ under the License.
 			<id>scala-2.11</id>
 			<activation>
 				<property>
-					<name>scala-2.11</name>
+					<name>!scala-2.11</name>
 				</property>
 			</activation>
 			<properties>
@@ -1024,6 +1024,8 @@ under the License.
 						<exclude>apache-maven-3.2.5/**</exclude>
 						<!-- PyCharm -->
 						<exclude>**/.idea/**</exclude>
+						<!-- Kinesalite cert -->
+						<exclude>flink-contrib/docker-flink/kinesalite.crt</exclude>
 					</excludes>
 				</configuration>
 			</plugin>
