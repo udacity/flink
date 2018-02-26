@@ -42,7 +42,6 @@ import org.apache.flink.streaming.util.serialization.SimpleStringSchema;
 
 import com.amazonaws.services.kinesis.model.SequenceNumberRange;
 import com.amazonaws.services.kinesis.model.Shard;
-
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
