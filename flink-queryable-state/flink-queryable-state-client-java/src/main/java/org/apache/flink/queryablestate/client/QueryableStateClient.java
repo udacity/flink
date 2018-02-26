@@ -108,9 +108,33 @@ public class QueryableStateClient {
 				new DisabledKvStateRequestStats());
 	}
 
-	/** Shuts down the client. */
-	public void shutdown() {
-		client.shutdown();
+	/**
+	 * Shuts down the client and returns a {@link CompletableFuture} that
+	 * will be completed when the shutdown process is completed.
+	 *
+	 * <p>If an exception is thrown for any reason, then the returned future
+	 * will be completed exceptionally with that exception.
+	 *
+	 * @return A {@link CompletableFuture} for further handling of the
+	 * shutdown result.
+	 */
+	public CompletableFuture<?> shutdownAndHandle() {
+		return client.shutdown();
+	}
+
+	/**
+	 * Shuts down the client and waits until shutdown is completed.
+	 *
+	 * <p>If an exception is thrown, a warning is logged containing
+	 * the exception message.
+	 */
+	public void shutdownAndWait() {
+		try {
+			client.shutdown().get();
+			LOG.info("The Queryable State Client was shutdown successfully.");
+		} catch (Exception e) {
+			LOG.warn("The Queryable State Client shutdown failed: ", e);
+		}
 	}
 
 	/**
@@ -244,7 +268,7 @@ public class QueryableStateClient {
 			final String queryableStateName,
 			final int keyHashCode,
 			final byte[] serializedKeyAndNamespace) {
-		LOG.info("Sending State Request to {}.", remoteAddress);
+		LOG.debug("Sending State Request to {}.", remoteAddress);
 		try {
 			KvStateRequest request = new KvStateRequest(jobId, queryableStateName, keyHashCode, serializedKeyAndNamespace);
 			return client.sendRequest(remoteAddress, request);

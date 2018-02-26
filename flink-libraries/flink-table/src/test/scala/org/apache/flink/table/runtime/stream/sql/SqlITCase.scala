@@ -18,25 +18,92 @@
 
 package org.apache.flink.table.runtime.stream.sql
 
-import java.util
-
 import org.apache.flink.api.common.typeinfo.{BasicTypeInfo, TypeInformation}
 import org.apache.flink.api.java.typeutils.RowTypeInfo
 import org.apache.flink.api.scala._
 import org.apache.flink.streaming.api.TimeCharacteristic
+import org.apache.flink.streaming.api.functions.AssignerWithPunctuatedWatermarks
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
+import org.apache.flink.streaming.api.watermark.Watermark
 import org.apache.flink.table.api.{TableEnvironment, Types}
 import org.apache.flink.table.api.scala._
+import org.apache.flink.table.expressions.utils.SplitUDF
+import org.apache.flink.table.runtime.stream.sql.SqlITCase.TimestampAndWatermarkWithOffset
 import org.apache.flink.table.runtime.utils.TimeTestUtil.EventTimeSourceFunction
 import org.apache.flink.table.runtime.utils.{StreamITCase, StreamTestData, StreamingWithStateTestBase}
 import org.apache.flink.types.Row
 import org.apache.flink.table.utils.MemoryTableSinkUtil
-
-import scala.collection.JavaConverters._
 import org.junit.Assert._
 import org.junit._
 
+import scala.collection.mutable
+
 class SqlITCase extends StreamingWithStateTestBase {
+
+  val data = List(
+    (1000L, "1", "Hello"),
+    (2000L, "2", "Hello"),
+    (3000L, null.asInstanceOf[String], "Hello"),
+    (4000L, "4", "Hello"),
+    (5000L, null.asInstanceOf[String], "Hello"),
+    (6000L, "6", "Hello"),
+    (7000L, "7", "Hello World"),
+    (8000L, "8", "Hello World"),
+    (20000L, "20", "Hello World"))
+
+  @Test
+  def testRowTimeTumbleWindow(): Unit = {
+
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+    env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
+    val tEnv = TableEnvironment.getTableEnvironment(env)
+    StreamITCase.testResults = mutable.MutableList()
+    StreamITCase.clear
+    env.setParallelism(1)
+
+    val stream = env
+                 .fromCollection(data)
+                 .assignTimestampsAndWatermarks(
+                   new TimestampAndWatermarkWithOffset[(Long, String, String)](0L))
+    val table = stream.toTable(tEnv, 'a, 'b, 'c, 'rowtime.rowtime)
+
+    tEnv.registerTable("T1", table)
+
+    val sqlQuery = "SELECT c, COUNT(*), COUNT(1), COUNT(b) FROM T1 " +
+      "GROUP BY TUMBLE(rowtime, interval '5' SECOND), c"
+
+    val result = tEnv.sqlQuery(sqlQuery).toAppendStream[Row]
+    result.addSink(new StreamITCase.StringSink[Row])
+    env.execute()
+
+    val expected = List("Hello World,2,2,2", "Hello World,1,1,1", "Hello,4,4,3", "Hello,2,2,1")
+    assertEquals(expected.sorted, StreamITCase.testResults.sorted)
+  }
+
+  @Test
+  def testNonWindowedCount(): Unit = {
+
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+    val tEnv = TableEnvironment.getTableEnvironment(env)
+    StreamITCase.retractedResults = mutable.ArrayBuffer()
+    StreamITCase.clear
+
+    env.setParallelism(1)
+
+    val stream = env.fromCollection(data)
+    val table = stream.toTable(tEnv, 'a, 'b, 'c)
+
+    tEnv.registerTable("T1", table)
+
+    val sqlQuery = "SELECT c, COUNT(*), COUNT(1), COUNT(b) FROM T1 GROUP BY c"
+
+    val result = tEnv.sqlQuery(sqlQuery).toRetractStream[Row]
+    result.addSink(new StreamITCase.RetractingSink)
+    env.execute()
+
+    val expected = List("Hello World,3,3,3", "Hello,6,6,4")
+    assertEquals(expected.sorted, StreamITCase.retractedResults.sorted)
+  }
 
    /** test row stream registered table **/
   @Test
@@ -479,6 +546,64 @@ class SqlITCase extends StreamingWithStateTestBase {
       "2,2,Hello,1970-01-01 00:00:00.002",
       "3,2,Hello world,1970-01-01 00:00:00.002")
     assertEquals(expected.sorted, MemoryTableSinkUtil.results.sorted)
+  }
+
+  @Test
+  def testUdfWithUnicodeParameter(): Unit = {
+    val data = List(
+      ("a\u0001b", "c\"d", "e\\\"\u0004f"),
+      ("x\u0001y", "y\"z", "z\\\"\u0004z")
+    )
+
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+
+    val tEnv = TableEnvironment.getTableEnvironment(env)
+    StreamITCase.clear
+
+    val splitUDF0 = new SplitUDF(deterministic = true)
+    val splitUDF1 = new SplitUDF(deterministic = false)
+
+    tEnv.registerFunction("splitUDF0", splitUDF0)
+    tEnv.registerFunction("splitUDF1", splitUDF1)
+
+    // user have to specify '\' with '\\' in SQL
+    val sqlQuery = "SELECT " +
+      "splitUDF0(a, '\u0001', 0) as a0, " +
+      "splitUDF1(a, '\u0001', 0) as a1, " +
+      "splitUDF0(b, '\"', 1) as b0, " +
+      "splitUDF1(b, '\"', 1) as b1, " +
+      "splitUDF0(c, '\\\\\"\u0004', 0) as c0, " +
+      "splitUDF1(c, '\\\\\"\u0004', 0) as c1 from T1"
+
+    val t1 = env.fromCollection(data).toTable(tEnv, 'a, 'b, 'c)
+
+    tEnv.registerTable("T1", t1)
+
+    val result = tEnv.sql(sqlQuery).toAppendStream[Row]
+    result.addSink(new StreamITCase.StringSink[Row])
+    env.execute()
+
+    val expected = List("a,a,d,d,e,e", "x,x,z,z,z,z")
+    assertEquals(expected.sorted, StreamITCase.testResults.sorted)
+  }
+}
+
+object SqlITCase {
+
+  class TimestampAndWatermarkWithOffset[T <: Product](
+      offset: Long) extends AssignerWithPunctuatedWatermarks[T] {
+
+    override def checkAndGetNextWatermark(
+        lastElement: T,
+        extractedTimestamp: Long): Watermark = {
+      new Watermark(extractedTimestamp - offset)
+    }
+
+    override def extractTimestamp(
+        element: T,
+        previousElementTimestamp: Long): Long = {
+      element.productElement(0).asInstanceOf[Long]
+    }
   }
 
 }

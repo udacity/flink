@@ -64,7 +64,7 @@ derived from these by transforming them using API methods such as `map`, `filter
 Anatomy of a Flink Program
 --------------------------
 
-Flink program programs look like regular programs that transform collections of data.
+Flink programs look like regular programs that transform collections of data.
 Each program consists of the same basic parts:
 
 1. Obtain an `execution environment`,
@@ -460,7 +460,7 @@ The following example shows a key selector function that simply returns the fiel
 // some ordinary POJO
 public class WC {public String word; public int count;}
 DataStream<WC> words = // [...]
-KeyedStream<WC> kyed = words
+KeyedStream<WC> keyed = words
   .keyBy(new KeySelector<WC, String>() {
      public String getKey(WC wc) { return wc.word; }
    });
@@ -495,7 +495,7 @@ The most basic way is to implement one of the provided interfaces:
 {% highlight java %}
 class MyMapFunction implements MapFunction<String, Integer> {
   public Integer map(String value) { return Integer.parseInt(value); }
-});
+};
 data.map(new MyMapFunction());
 {% endhighlight %}
 
@@ -528,7 +528,7 @@ instead take as argument a *rich* function. For example, instead of
 {% highlight java %}
 class MyMapFunction implements MapFunction<String, Integer> {
   public Integer map(String value) { return Integer.parseInt(value); }
-});
+};
 {% endhighlight %}
 
 you can write
@@ -536,7 +536,7 @@ you can write
 {% highlight java %}
 class MyMapFunction extends RichMapFunction<String, Integer> {
   public Integer map(String value) { return Integer.parseInt(value); }
-});
+};
 {% endhighlight %}
 
 and pass the function as usual to a `map` transformation:
@@ -586,7 +586,7 @@ you can write
 {% highlight scala %}
 class MyMapFunction extends RichMapFunction[String, Int] {
   def map(in: String):Int = { in.toInt }
-})
+};
 {% endhighlight %}
 
 and pass the function to a `map` transformation:

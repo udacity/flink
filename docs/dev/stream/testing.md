@@ -68,7 +68,7 @@ public class SumReduceTest {
 
     @Test
     public void testSum() throws Exception {
-        // intiantiate your function
+        // instantiate your function
         SumReduce sumReduce = new SumReduce();
 
         // call the methods that you have implemented
@@ -83,7 +83,7 @@ public class SumReduceTest {
 class SumReduceTest extends FlatSpec with Matchers {
 
     "SumReduce" should "add values" in {
-        // intiantiate your function
+        // instantiate your function
         val sumReduce: SumReduce = new SumReduce()
 
         // call the methods that you have implemented
@@ -247,8 +247,8 @@ env.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 100));
 
 <div data-lang="scala" markdown="1">
 {% highlight scala %}
-env.enableCheckpointing(500);
-env.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 100));
+env.enableCheckpointing(500)
+env.setRestartStrategy(RestartStrategies.fixedDelayRestart(3, 100))
 {% endhighlight %}
 </div>
 </div>
