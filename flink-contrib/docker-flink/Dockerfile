@@ -16,10 +16,10 @@
 # limitations under the License.
 ################################################################################
 
-FROM java:8-jre-alpine
+FROM frolvlad/alpine-oraclejdk8:cleaned
 
 # Install requirements
-RUN apk add --no-cache bash snappy
+RUN apk add --no-cache bash snappy su-exec
 
 # Flink environment variables
 ENV FLINK_INSTALL_PATH=/opt
@@ -36,6 +36,13 @@ RUN set -x && \
   addgroup -S flink && adduser -D -S -H -G flink -h $FLINK_HOME flink && \
   chown -R flink:flink $FLINK_INSTALL_PATH/flink-* && \
   chown -h flink:flink $FLINK_HOME
+
+# Importing Kinesalit certs and update log4j.properties
+COPY kinesalite.crt /
+RUN set -x && \
+  keytool -import -file /kinesalite.crt -storepass changeit -keystore $JAVA_HOME/jre/lib/security/cacerts -noprompt && \
+  rm /kinesalite.crt && \
+  printf "\nlog4j.logger.com.udacity.data=DEBUG\n" >> $FLINK_HOME/conf/log4j-console.properties
 
 COPY docker-entrypoint.sh /
 
