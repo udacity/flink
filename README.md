@@ -1,3 +1,18 @@
+This is a fork from https://github.com/apache/flink, with our own patches for bug fixes or workaround.
+
+We also build artifacts from this fork with Amazon Kinesis enabled, and publish them to [Udacity's Artifactory repo](https://udacity.jfrog.io/udacity/libs-release-local).
+
+To build and deploy, run
+
+```
+mvn clean deploy -Pinclude-kinesis -DskipTests \
+  -DaltDeploymentRepository=central::default::https://udacity.jfrog.io/udacity/libs-release-local
+```
+
+The fork will be sync with upstream periodically. Last sync: 2/26/2018 for 1.4 release.
+
+======================================================================================
+
 # Apache Flink
 
 Apache Flink is an open source stream processing framework with powerful stream- and batch-processing capabilities.
