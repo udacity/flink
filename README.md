@@ -9,7 +9,17 @@ mvn clean deploy -Pinclude-kinesis -DskipTests \
   -DaltDeploymentRepository=central::default::https://udacity.jfrog.io/udacity/libs-release-local
 ```
 
-The fork will be sync with upstream periodically. Last sync: 2/26/2018 for 1.4 release.
+We also build the customized Flink docker image from this fork. After building the distribution from your branch, pick up the Dockerfile and other files needed from the `flink-contrib/docker-flink` directory to build and publish the image:
+
+```
+cd flink-contrib/docker-flink
+git checkout 1.4.0-udadity .
+bash build.sh --from-local-dist
+docker tag <ImageID> udacity/flink-oraclejdk8:<ImageTag>
+docker push udacity/flink-oraclejdk8
+```
+
+The fork will be sync'ed with the upstream periodically. Last sync: 2/26/2018 for 1.4 release.
 
 ======================================================================================
 
