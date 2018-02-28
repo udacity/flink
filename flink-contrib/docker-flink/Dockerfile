@@ -19,7 +19,7 @@
 FROM frolvlad/alpine-oraclejdk8:cleaned
 
 # Install requirements
-RUN apk add --no-cache bash snappy su-exec
+RUN apk add --no-cache bash snappy su-exec libuuid libidn
 
 # Flink environment variables
 ENV FLINK_INSTALL_PATH=/opt
