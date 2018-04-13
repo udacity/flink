@@ -143,11 +143,11 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 
 			// -------------- Raw State Streams --------------
 			rawKeyedStateInputs = rawKeyedStateInputs(
-				prioritizedOperatorSubtaskStates.getPrioritizedRawKeyedState());
+				prioritizedOperatorSubtaskStates.getPrioritizedRawKeyedState().iterator());
 			streamTaskCloseableRegistry.registerCloseable(rawKeyedStateInputs);
 
 			rawOperatorStateInputs = rawOperatorStateInputs(
-				prioritizedOperatorSubtaskStates.getPrioritizedRawOperatorState());
+				prioritizedOperatorSubtaskStates.getPrioritizedRawOperatorState().iterator());
 			streamTaskCloseableRegistry.registerCloseable(rawOperatorStateInputs);
 
 			// -------------- Internal Timer Service Manager --------------
@@ -166,19 +166,16 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 
 			// cleanup if something went wrong before results got published.
 			if (streamTaskCloseableRegistry.unregisterCloseable(keyedStatedBackend)) {
-				IOUtils.closeQuietly(keyedStatedBackend);
+				// release resource (e.g native resource)
+				keyedStatedBackend.dispose();
 			}
 
 			if (streamTaskCloseableRegistry.unregisterCloseable(operatorStateBackend)) {
-				IOUtils.closeQuietly(keyedStatedBackend);
+				operatorStateBackend.dispose();
 			}
 
 			if (streamTaskCloseableRegistry.unregisterCloseable(rawKeyedStateInputs)) {
 				IOUtils.closeQuietly(rawKeyedStateInputs);
-			}
-
-			if (streamTaskCloseableRegistry.unregisterCloseable(rawOperatorStateInputs)) {
-				IOUtils.closeQuietly(rawOperatorStateInputs);
 			}
 
 			if (streamTaskCloseableRegistry.unregisterCloseable(rawOperatorStateInputs)) {
@@ -226,12 +223,16 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 		PrioritizedOperatorSubtaskState prioritizedOperatorSubtaskStates,
 		CloseableRegistry backendCloseableRegistry) throws Exception {
 
+		String logDescription = "operator state backend for " + operatorIdentifierText;
+
 		BackendRestorerProcedure<OperatorStateBackend, OperatorStateHandle> backendRestorer =
 			new BackendRestorerProcedure<>(
 				() -> stateBackend.createOperatorStateBackend(environment, operatorIdentifierText),
-				backendCloseableRegistry);
+				backendCloseableRegistry,
+				logDescription);
 
-		return backendRestorer.createAndRestore(prioritizedOperatorSubtaskStates.getPrioritizedManagedOperatorState());
+		return backendRestorer.createAndRestore(
+			prioritizedOperatorSubtaskStates.getPrioritizedManagedOperatorState());
 	}
 
 	protected <K> AbstractKeyedStateBackend<K> keyedStatedBackend(
@@ -243,6 +244,8 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 		if (keySerializer == null) {
 			return null;
 		}
+
+		String logDescription = "keyed state backend for " + operatorIdentifierText;
 
 		TaskInfo taskInfo = environment.getTaskInfo();
 
@@ -261,17 +264,17 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 					taskInfo.getMaxNumberOfParallelSubtasks(),
 					keyGroupRange,
 					environment.getTaskKvStateRegistry()),
-					backendCloseableRegistry);
+				backendCloseableRegistry,
+				logDescription);
 
-		return backendRestorer.createAndRestore(prioritizedOperatorSubtaskStates.getPrioritizedManagedKeyedState());
+		return backendRestorer.createAndRestore(
+			prioritizedOperatorSubtaskStates.getPrioritizedManagedKeyedState());
 	}
 
 	protected CloseableIterable<StatePartitionStreamProvider> rawOperatorStateInputs(
 		Iterator<StateObjectCollection<OperatorStateHandle>> restoreStateAlternatives) {
 
 		if (restoreStateAlternatives.hasNext()) {
-
-			final CloseableRegistry closeableRegistry = new CloseableRegistry();
 
 			Collection<OperatorStateHandle> rawOperatorState = restoreStateAlternatives.next();
 			// TODO currently this does not support local state recovery, so we expect there is only one handle.
@@ -280,8 +283,10 @@ public class StreamTaskStateInitializerImpl implements StreamTaskStateInitialize
 				"Local recovery is currently not implemented for raw operator state, but found state alternative.");
 
 			if (rawOperatorState != null) {
-
 				return new CloseableIterable<StatePartitionStreamProvider>() {
+
+					final CloseableRegistry closeableRegistry = new CloseableRegistry();
+
 					@Override
 					public void close() throws IOException {
 						closeableRegistry.close();

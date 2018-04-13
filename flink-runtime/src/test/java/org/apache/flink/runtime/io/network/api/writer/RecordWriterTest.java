@@ -41,11 +41,8 @@ import org.apache.flink.types.IntValue;
 import org.apache.flink.util.XORShiftRandom;
 
 import org.junit.Test;
-import org.junit.runner.RunWith;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
-import org.powermock.core.classloader.annotations.PrepareForTest;
-import org.powermock.modules.junit4.PowerMockRunner;
 
 import java.io.IOException;
 import java.util.ArrayDeque;
@@ -71,8 +68,6 @@ import static org.mockito.Mockito.when;
 /**
  * Tests for the {@link RecordWriter}.
  */
-@PrepareForTest({EventSerializer.class})
-@RunWith(PowerMockRunner.class)
 public class RecordWriterTest {
 
 	// ---------------------------------------------------------------------------------------------
@@ -304,18 +299,23 @@ public class RecordWriterTest {
 			new CollectingPartitionWriter(queues, new TestPooledBufferProvider(Integer.MAX_VALUE));
 		RecordWriter<?> writer = new RecordWriter<>(partition);
 
-		BufferConsumer bufferConsumer = writer.broadcastEvent(EndOfPartitionEvent.INSTANCE);
+		writer.broadcastEvent(EndOfPartitionEvent.INSTANCE);
 
 		// Verify added to all queues
 		assertEquals(1, queues[0].size());
 		assertEquals(1, queues[1].size());
+
+		// get references to buffer consumers (copies from the original event buffer consumer)
+		BufferConsumer bufferConsumer1 = queues[0].getFirst();
+		BufferConsumer bufferConsumer2 = queues[1].getFirst();
 
 		// process all collected events (recycles the buffer)
 		for (int i = 0; i < queues.length; i++) {
 			assertTrue(parseBuffer(queues[i].remove(), i).isEvent());
 		}
 
-		assertTrue(bufferConsumer.isRecycled());
+		assertTrue(bufferConsumer1.isRecycled());
+		assertTrue(bufferConsumer2.isRecycled());
 	}
 
 	/**

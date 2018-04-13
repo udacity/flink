@@ -47,7 +47,6 @@ import org.apache.flink.optimizer.plan.StreamingPlan;
 import org.apache.flink.optimizer.plandump.PlanJSONDumpGenerator;
 import org.apache.flink.runtime.akka.AkkaUtils;
 import org.apache.flink.runtime.client.JobStatusMessage;
-import org.apache.flink.runtime.concurrent.FutureUtils;
 import org.apache.flink.runtime.jobgraph.JobGraph;
 import org.apache.flink.runtime.jobgraph.JobStatus;
 import org.apache.flink.runtime.messages.Acknowledge;
@@ -86,6 +85,7 @@ import scala.concurrent.duration.FiniteDuration;
 
 import static org.apache.flink.client.cli.CliFrontendParser.HELP_OPTION;
 import static org.apache.flink.client.cli.CliFrontendParser.MODIFY_PARALLELISM_OPTION;
+import static org.apache.flink.client.program.ClusterClient.MAX_SLOTS_UNKNOWN;
 
 /**
  * Implementation of a simple command line frontend for executing programs.
@@ -119,7 +119,7 @@ public class CliFrontend {
 
 	private final int defaultParallelism;
 
-	private final boolean flip6;
+	private final boolean isNewMode;
 
 	public CliFrontend(
 			Configuration configuration,
@@ -144,7 +144,7 @@ public class CliFrontend {
 		this.clientTimeout = AkkaUtils.getClientTimeout(this.configuration);
 		this.defaultParallelism = configuration.getInteger(CoreOptions.DEFAULT_PARALLELISM);
 
-		this.flip6 = CoreOptions.FLIP6_MODE.equalsIgnoreCase(configuration.getString(CoreOptions.MODE));
+		this.isNewMode = CoreOptions.NEW_MODE.equalsIgnoreCase(configuration.getString(CoreOptions.MODE));
 	}
 
 	// --------------------------------------------------------------------------------------------
@@ -225,7 +225,7 @@ public class CliFrontend {
 			final ClusterClient<T> client;
 
 			// directly deploy the job if the cluster is started in job mode and detached
-			if (flip6 && clusterId == null && runOptions.getDetachedMode()) {
+			if (isNewMode && clusterId == null && runOptions.getDetachedMode()) {
 				int parallelism = runOptions.getParallelism() == -1 ? defaultParallelism : runOptions.getParallelism();
 
 				final JobGraph jobGraph = PackagedProgramUtils.createJobGraph(program, configuration, parallelism);
@@ -262,7 +262,7 @@ public class CliFrontend {
 
 					int userParallelism = runOptions.getParallelism();
 					LOG.debug("User parallelism is set to {}", userParallelism);
-					if (client.getMaxSlots() != -1 && userParallelism == -1) {
+					if (client.getMaxSlots() != MAX_SLOTS_UNKNOWN && userParallelism == -1) {
 						logAndSysout("Using the parallelism provided by the remote cluster ("
 							+ client.getMaxSlots() + "). "
 							+ "To use another parallelism, set it at the ./bin/flink client.");
@@ -705,7 +705,7 @@ public class CliFrontend {
 
 		logAndSysout("Disposing savepoint '" + savepointPath + "'.");
 
-		final CompletableFuture<Acknowledge> disposeFuture = clusterClient.disposeSavepoint(savepointPath, FutureUtils.toTime(clientTimeout));
+		final CompletableFuture<Acknowledge> disposeFuture = clusterClient.disposeSavepoint(savepointPath);
 
 		logAndSysout("Waiting for response...");
 
@@ -1158,14 +1158,14 @@ public class CliFrontend {
 					configurationDirectory,
 					"y",
 					"yarn"));
-		} catch (Exception e) {
+		} catch (NoClassDefFoundError | Exception e) {
 			LOG.warn("Could not load CLI class {}.", flinkYarnSessionCLI, e);
 		}
 
-		if (configuration.getString(CoreOptions.MODE).equalsIgnoreCase(CoreOptions.FLIP6_MODE)) {
-			customCommandLines.add(new Flip6DefaultCLI(configuration));
-		} else {
+		if (configuration.getString(CoreOptions.MODE).equalsIgnoreCase(CoreOptions.NEW_MODE)) {
 			customCommandLines.add(new DefaultCLI(configuration));
+		} else {
+			customCommandLines.add(new LegacyCLI(configuration));
 		}
 
 		return customCommandLines;
