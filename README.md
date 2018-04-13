@@ -19,7 +19,7 @@ docker tag <ImageID> udacity/flink-oraclejdk8:<ImageTag>
 docker push udacity/flink-oraclejdk8
 ```
 
-The fork will be sync'ed with the upstream periodically. Last sync: 2/26/2018 for 1.4 release.
+The fork will be sync'ed with the upstream periodically. Last sync: 4/13/2018 for 1.4.2 release.
 
 ======================================================================================
 
